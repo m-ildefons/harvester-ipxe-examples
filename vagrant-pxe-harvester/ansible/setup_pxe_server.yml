@@ -8,9 +8,9 @@
     - role: dhcp
     - role: tftp
     - role: https
-      when: settings['harvester_network_config']['dhcp_server']['https']
+      when: settings['networks'][0]['https']
     - role: http
     - role: ipxe
     - role: harvester
     - role: proxy
-      when: settings['harvester_network_config']['offline']
+      when: settings['harvester']['airgapped']

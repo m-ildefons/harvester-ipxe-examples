@@ -10,10 +10,10 @@ ST = VA
 L = SomeCity
 O = MyCompany
 OU = MyDivision
-CN = {{ settings['harvester_network_config']['dhcp_server']['ip'] }}
+CN = {{ settings['pxe_server']['ip'] }}
 [v3_req]
 keyUsage = keyEncipherment, dataEncipherment
 extendedKeyUsage = serverAuth
 subjectAltName = @alt_names
 [alt_names]
-IP.1 = {{ settings['harvester_network_config']['dhcp_server']['ip'] }}
+IP.1 = {{ settings['pxe_server']['ip'] }}

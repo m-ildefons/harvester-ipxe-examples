@@ -10,35 +10,48 @@ max-lease-time 7200;
 authoritative;
 log-facility local7;
 
-subnet {{ settings['harvester_network_config']['dhcp_server']['subnet'] }} netmask {{ settings['harvester_network_config']['dhcp_server']['netmask'] }} {
-    range {{ settings['harvester_network_config']['dhcp_server']['range'] }};
-    option domain-name-servers {{ settings['harvester_network_config']['dhcp_server']['dns_server'] }}, {{ settings['harvester_network_config']['dhcp_server']['ip'] }}, 8.8.8.8;
-    {% if settings['harvester_network_config']['offline'] %}
-    option routers {{ settings['harvester_network_config']['dhcp_server']['ip'] }};
-    {% else %}
-    option routers {{ settings['harvester_network_config']['dhcp_server']['subnet'][:-1] }}1;
-    {% endif %}
-    next-server {{ settings['harvester_network_config']['dhcp_server']['ip'] }};
+{% for net in settings['networks'] %}
+{% with net_idx = loop.index0 %}
+{% if net['dhcp_range'] is defined %}
+subnet {{ net['subnet'] }} netmask {{ net['netmask'] }} {
+    range {{ net['dhcp_range']['start'] }} {{ net['dhcp_range']['end'] }};
+    option domain-name-servers {{ net['subnet'][:-1] }}254, {{ settings['pxe_server']['dns_server'] }}, 8.8.8.8;
 
-   if exists user-class and option user-class = "iPXE" {
-        filename "http://{{ settings['harvester_network_config']['dhcp_server']['ip'] }}/harvester/${net1/mac}";
+{% if settings['harvester']['airgapped'] %}
+    option routers {{ net['subnet'][:-1] }}254;
+{% else %}
+    option routers {{ net['subnet'][:-1] }}1;
+{% endif %}
+
+{% if net['boot'] is defined and net['boot'] %}
+    next-server {{ net['subnet'][:-1] }}254;
+
+    if exists user-class and option user-class = "iPXE" {
+        filename "http://{{ net['subnet'][:-1] }}254/harvester/${net1/mac}";
     } elsif option arch != 00:00 {
         filename "ipxe/ipxe.efi";
     } else {
         filename "ipxe/undionly.kpxe";
     }
-}
+{% endif %}
 
-host harvest_vip {
-    hardware ethernet {{ settings['harvester_network_config']['vip']['mac'] }};
-    fixed-address {{ settings['harvester_network_config']['vip']['ip'] }};
-}
-
-{% for node_number in range(settings['harvester_network_config']['cluster'] | length) %}
-host harvest_node_{{ node_number }} {
-    hardware ethernet {{ settings['harvester_network_config']['cluster'][node_number]['mac'] }};
-    fixed-address {{ settings['harvester_network_config']['cluster'][node_number]['ip'] }};
-    server-name "harvester-node-{{ node_number }}";
-}
-
+{% for node in settings['harvester']['cluster'] %}
+{% with node_idx = loop.index0 %}
+{% if net['name'] in node['networks'] %}
+    host {{ node['name'] }}-{{ net_idx }} {
+        hardware ethernet 02:00:0{{ net_idx }}:{{ node_idx }}D:62:E2;
+        fixed-address {{ net['subnet'][:-1] }}3{{ node_idx }};
+        server-name {{ node['name'] }};
+    }
+{% endif %}
+{% endwith %}
 {% endfor %}
+}
+
+{% endif %}
+{% endwith %}
+{% endfor %}
+host harvest_vip {
+    hardware ethernet {{ settings['harvester']['vip']['mac'] }};
+    fixed-address {{ settings['harvester']['vip']['ip'] }};
+}

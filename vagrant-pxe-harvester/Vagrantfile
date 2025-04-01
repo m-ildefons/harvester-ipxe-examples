@@ -60,15 +60,22 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.define :pxe_server do |pxe_server|
     pxe_server.vm.box = 'generic/debian11'
     pxe_server.vm.hostname = 'pxe-server'
-    pxe_server.vm.network 'private_network',
-      ip: @settings['harvester_network_config']['dhcp_server']['ip'],
-      libvirt__network_name: 'harvester',
-      libvirt__dhcp_enabled: false
+
+    nets = @settings['networks']
+    num_nets = nets.length - 1
+    (0..num_nets).each do |net_idx|
+      net = nets[net_idx]
+
+      pxe_server.vm.network 'private_network',
+        ip: "#{net['subnet'][0, net['subnet'].length - 1]}254",
+        libvirt__network_name: net['name'],
+        libvirt__dhcp_enabled: false
+    end
 
     pxe_server.vm.provider :libvirt do |libvirt|
       libvirt.cpu_mode = 'host-passthrough'
-      libvirt.memory = '2048'
-      libvirt.cpus = '2'
+      libvirt.memory = @settings['pxe_server'].key?('memory_G') ? @settings['pxe_server']['memory_G'] * 1024 : 4096
+      libvirt.cpus = @settings['pxe_server'].key?('cpu') ? @settings['pxe_server']['cpu'] : 2
     end
 
     pxe_server.vm.provision :ansible do |ansible|
@@ -80,29 +87,42 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   end
 
   # Harvester
-  nodes = @settings['harvester_network_config']['cluster']
-  cluster_node_index = nodes.length - 1
-  (0..cluster_node_index).each do |node_number|
-    node = nodes[node_number]
+  nodes = @settings['harvester']['cluster']
+  num_nodes = nodes.length - 1
+  (0..num_nodes).each do |node_idx|
+    node = nodes[node_idx]
 
-    vm_name = "harvester-node-#{node_number}"
+    vm_name = node.key?('name') ? node['name'] : "node-#{node_idx}"
     config.vm.define vm_name, autostart: false do |harvester_node|
-      harvester_node.vm.hostname = "harvester-node-#{node_number}"
-      harvester_node.vm.network 'private_network',
-        libvirt__network_name: 'harvester',
-        mac: node['mac']
+      harvester_node.vm.hostname = vm_name
+
+      nets = @settings['networks']
+      num_nets = nets.length - 1
+      (0..num_nets).each do |net_idx|
+        net = nets[net_idx]
+
+        if net.key?('boot') && net['boot'] == true
+          boot_network = {'network' => net['name']}
+        end
+
+        if node['networks'].include? net['name']
+          harvester_node.vm.network 'private_network',
+            libvirt__network_name: net['name'],
+            mac: "02:00:0#{net_idx}:#{node_idx}d:62:e2"
+        end
+      end
 
       harvester_node.vm.provider :libvirt do |libvirt|
         # libvirt.nested = true
         libvirt.cpu_mode = 'host-passthrough'
-        libvirt.memory = node.key?('memory') ? node['memory'] : 8192
+        libvirt.memory = node.key?('memory_G') ? (node['memory_G'] * 1024) : 8192
         libvirt.cpus = node.key?('cpu') ? node['cpu'] : 4
 
         # disks
         disks = node['disks']
         num_disks = disks.length - 1
-        (0..num_disks).each do |disk_index|
-          disk = disks[disk_index]
+        (0..num_disks).each do |disk_idx|
+          disk = disks[disk_idx]
 
           if disk['bus'] == 'scsi'
             libvirt.storage :file,
@@ -111,7 +131,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
               type: 'qcow2',
               bus: disk['bus'],
               cache: disk.key?('cache') ? disk['cache'] : 'default',
-              wwn: disk.key?('wwn') ? disk['wwn'] : '0x5100000000000001'
+              wwn: disk.key?('wwn') ? disk['wwn'] : (5836665117072162817 + node_idx + disk_idx).to_s(16)
           elsif disk['bus'] == 'nvme'
             nvme_name = "#{File.basename(@root_dir)}_#{vm_name}-#{disk['name']}.qcow2"
             nvme_path = File.join(@pool_path, nvme_name)
@@ -122,13 +142,13 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
                 bootidx_str = ",bootindex=0"
               end
             else
-              if disk_index == 0
+              if disk_idx == 0
                 bootidx_str = ",bootindex=0"
               end
             end
 
-            serial_nr = "#{node_number}#{disk_index}_1234"
-            addr = "1#{disk_index}"
+            serial_nr = "#{node_idx}#{disk_idx}_1234"
+            addr = 6 + nets.length + disk_idx
 
             libvirt.qemuargs :value => '-drive'
             libvirt.qemuargs :value => "file=#{nvme_path},if=none,id=#{disk['name']}"
@@ -152,7 +172,16 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
           end
         end
 
-        boot_network = {'network' => 'harvester'}
+        boot_network = {'network' => @settings['networks'][0]['name']}
+        nets = @settings['networks']
+        num_nets = nets.length - 1
+        (0..num_nets).each do |net_idx|
+          net = nets[net_idx]
+
+          if net.key?('boot') && net['boot'] == true
+            boot_network = {'network' => net['name']}
+          end
+        end
         libvirt.boot 'hd'
         libvirt.boot boot_network
         # NOTE: default to UEFI boot. Comment this out for legacy BIOS.

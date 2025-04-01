@@ -1,6 +1,5 @@
 - set_fact:
-    mac: "{{ settings['harvester_network_config']['cluster'][node_number | int]['mac'] | lower }}"
-    disks: "{{ settings.harvester_network_config.cluster[node_number | int].disks }}"
+    disks: "{{ settings.harvester.cluster[node_number | int].disks }}"
 
 - set_fact:
     nvme_disks: "{{ disks | selectattr(\"bus\", \"defined\") | selectattr(\"bus\", \"eq\", \"nvme\") }}"
@@ -27,6 +26,6 @@
 - name: create boot entry for the cluster members
   template:
     src: ipxe-join.j2
-    dest: /var/www/harvester/{{ mac }}
+    dest: /var/www/harvester/02:00:00:{{ node_number }}d:62:e2
     owner: www-data
     mode: 0640
