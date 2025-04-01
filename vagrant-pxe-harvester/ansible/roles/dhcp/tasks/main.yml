@@ -6,9 +6,9 @@
     update_cache: yes
 
 - name: configure isc-dhcp-server interface
-  copy:
-    src: isc-dhcp-server
-    dest: /etc/default/
+  template:
+    src: isc-dhcp-server.j2
+    dest: /etc/default/isc-dhcp-server
   notify: restart dhcp
 
 - name: configure ipxe.conf

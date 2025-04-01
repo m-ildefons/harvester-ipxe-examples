@@ -1,4 +1,8 @@
 TFTP_USERNAME="tftp"
 TFTP_DIRECTORY="/tftpboot"
-TFTP_ADDRESS="{{ settings['harvester_network_config']['dhcp_server']['ip'] }}:69"
+{% for net in settings['networks'] %}
+{% if net['boot'] is defined and net['boot'] %}
+TFTP_ADDRESS="{{ net['subnet'][:-1] }}254:69"
+{% endif %}
+{% endfor %}
 TFTP_OPTIONS="--secure"

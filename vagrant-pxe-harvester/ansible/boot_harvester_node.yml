@@ -8,17 +8,13 @@
   debug:
     msg: "{{ figlet_result.stdout }}"
 
-- name: set Harvester Node IP fact
-  set_fact:
-    harvester_node_ip: "{{ harvester_network_config['cluster'][node_number | int]['ip'] }}"
-
-- name: set Harvester Node Role fact
-  set_fact:
-    harvester_node_role: "{{ harvester_network_config['cluster'][node_number | int]['role'] }}"
+- set_fact:
+    harvester_node_ip: "{{ networks[0]['subnet'][:-1] }}1{{ node_number }}"
+    harvester_node_role: "{{ harvester['cluster'][node_number | int]['role'] }}"
 
 - name: boot Harvester Node {{ node_number }}
   shell: >
-    vagrant up harvester-node-{{ node_number }}
+    vagrant up {{ harvester['cluster'][node_number | int]['name'] }}
   register: harvester_node_boot_result
 
 # Check node get ready
@@ -27,7 +23,7 @@
   when: harvester_node_role != "witness"
   uri:
     url: "https://{{ harvester_node_ip }}"
-    validate_certs: no
+    validate_certs: false
     status_code: 200
     timeout: 120
   register: auth_modes_lookup_result

@@ -11,8 +11,7 @@
     recurse: yes
 
 - set_fact:
-    mac: "{{ settings['harvester_network_config']['cluster'][0]['mac'] | lower }}"
-    disks: "{{ settings.harvester_network_config.cluster[0].disks }}"
+    disks: "{{ settings.harvester.cluster[0].disks }}"
 
 - set_fact:
     nvme_disks: "{{ disks | selectattr(\"bus\", \"defined\") | selectattr(\"bus\", \"eq\", \"nvme\") }}"
@@ -39,7 +38,7 @@
 - name: create boot entry for the first node
   template:
     src: ipxe-create.j2
-    dest: /var/www/harvester/{{ mac }}
+    dest: /var/www/harvester/02:00:00:0d:62:e2
     owner: www-data
     mode: 0640
 
@@ -47,7 +46,7 @@
 # make sure end sequence is at least 1 even if we have only one Harvester node
 - name: set node sequence fact
   set_fact:
-    end_sequence: "{{ [1, settings['harvester_network_config']['cluster'] | length - 1] | max }}"
+    end_sequence: "{{ [1, settings['harvester']['cluster'] | length - 1] | max }}"
 
 - name: Joining
   block:
@@ -62,23 +61,23 @@
 - name: download Harvester kernel
   include_tasks: _download_media.yml
   vars:
-    harvester_media_url: "{{ settings['harvester_kernel_url'] }}"
+    harvester_media_url: "{{ settings['kernel_url'] }}"
     media_filename: "harvester-vmlinuz-amd64"
 
 - name: download Harvester ramdisk
   include_tasks: _download_media.yml
   vars:
-    harvester_media_url: "{{ settings['harvester_ramdisk_url'] }}"
+    harvester_media_url: "{{ settings['ramdisk_url'] }}"
     media_filename: "harvester-initrd-amd64"
 
 - name: download Harvester ISO
   include_tasks: _download_media.yml
   vars:
-    harvester_media_url: "{{ settings['harvester_iso_url'] }}"
+    harvester_media_url: "{{ settings['iso_url'] }}"
     media_filename: "harvester-amd64.iso"
 
 - name: download Harvester Root FS
   include_tasks: _download_media.yml
   vars:
-    harvester_media_url: "{{ settings['harvester_rootfs_url'] }}"
+    harvester_media_url: "{{ settings['rootfs_url'] }}"
     media_filename: "harvester-rootfs-amd64.squashfs"
