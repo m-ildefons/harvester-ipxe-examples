@@ -81,53 +81,73 @@ harvester:
   # where X is the number of the network starting at 0 and Y is the number of
   # the node starting at 0
   cluster:
-    - name: node-1
+
+#    - name: harv0
+#      cpu: 16
+#      memory_G: 36
+#      disks:
+#        - name: vda
+#          size: 1000G
+#          bus: virtio
+#        - name: sda
+#          size: 1000G
+#          bus: scsi
+#      root_disk: vda
+#      data_disk: vda
+#      networks:
+#        - mgmt
+#        - storage
+#      role: default
+
+# Some examples below:
+#
+    - name: harv0
       cpu: 8
       memory_G: 16
       disks:
-        - name: nvme0n1
+        - name: vda
           size: 300G
-          bus: nvme
+          bus: virtio
         - name: sda
           size: 1000G
           bus: scsi
         - name: sdb
           size: 1000G
           bus: scsi
-      root_disk: nvme0n1
-      data_disk: sda
-      networks:
-        - mgmt
-        - storage
-        - workloads
-        - migrations
-      # role: default, management, witness or worker
-      role: default
-
-    - name: node-2
-      cpu: 8
-      memory_G: 16
-      disks:
-        - name: nvme0n1
-          size: 300G
-          bus: nvme
-        - name: vda
-          size: 1000G
-          bus: virtio
-        - name: vdb
-          size: 1000G
-          bus: virtio
-      root_disk: nvme0n1
+      root_disk: vda
       data_disk: vda
       networks:
         - mgmt
         - storage
-        - workloads
         - migrations
+        - workloads
       # role: default, management, witness or worker
       role: default
 
-    - name: node-w
+    - name: harv1
+      cpu: 8
+      memory_G: 16
+      disks:
+        - name: vda
+          size: 300G
+          bus: virtio
+        - name: sda
+          size: 1000G
+          bus: scsi
+        - name: sdb
+          size: 1000G
+          bus: scsi
+      root_disk: vda
+      data_disk: vda
+      networks:
+        - mgmt
+        - storage
+        - migrations
+        - workloads
+      # role: default, management, witness or worker
+      role: default
+
+    - name: wit
       cpu: 4
       memory_G: 8
       disks:
