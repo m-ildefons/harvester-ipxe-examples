@@ -1,0 +1,7 @@
+{% for server in settings['harvester']['global']['ntp_servers'] %}
+server {{ server }}
+{% endfor %}
+
+{% for net in settings['networks'] %}
+listen on {{ net['subnet'][:-1] }}254
+{% endfor %}

@@ -38,7 +38,7 @@
 - name: create boot entry for the first node
   template:
     src: ipxe-create.j2
-    dest: /var/www/harvester/02:00:00:0d:62:e2
+    dest: /var/www/harvester/02:00:00:03:3e:00
     owner: www-data
     mode: 0640
 

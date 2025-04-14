@@ -34,7 +34,6 @@ networks:
     dhcp_range:
       start: 192.168.0.50
       end: 192.168.0.130
-    https: false
     boot: true
 
   - name: storage
@@ -55,13 +54,18 @@ networks:
 pxe_server:
   cpu: 2       # Number of vCPUs
   memory_G: 4  # Memory size in GiB
-  #  Change this to a custom DNS server if you need one for your DHCP scope
-  dns_server: 1.1.1.1
+  # Change this to a custom DNS server if you need one for your DHCP scope
+  # In each network, xxx.yyy.zzz.1 is automatically added as DNS server. This
+  # server is provided by dnsmasq on the libvirt host
+  #dns_server: 1.1.1.1
+
+  # This configures a self-signed certificate on the HTTP server
+  https: true
 
 harvester:
   # Run as an airgapped environment that only has internet connectivity through
   # an HTTP proxy. The HTTP proxy runs on DHCP server using port 3128
-  airgapped: false
+  airgapped: true
   sftp: true
   token: token
 
@@ -89,15 +93,12 @@ harvester:
 #        - name: vda
 #          size: 1000G
 #          bus: virtio
-#        - name: sda
-#          size: 1000G
-#          bus: scsi
 #      root_disk: vda
 #      data_disk: vda
 #      networks:
 #        - mgmt
-#        - storage
 #      role: default
+#      labels: {}
 
 # Some examples below:
 #
@@ -167,8 +168,12 @@ harvester:
     # This is a list of DNS servers that will be included in your Harvester OS
     # config
     dns_servers:
-      - 192.168.0.254
-      - 8.8.8.8
+      - 192.168.0.1
+
+    # If running in an airgapped environment, these servers will be configured
+    # as NTP peers on the PXE server and the PXE server will be NTP server for
+    # the Harvester cluster. Otherwise these servers will be NTP servers for the
+    # Harvester cluster directly.
     ntp_servers:
       - 0.suse.pool.ntp.org
       - 1.suse.pool.ntp.org

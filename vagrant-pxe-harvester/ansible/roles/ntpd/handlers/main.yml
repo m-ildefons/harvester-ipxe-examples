@@ -1,0 +1,7 @@
+---
+- name: restart ntpd
+  systemd:
+    name: openntpd
+    state: restarted
+    daemon_reload: true
+    enabled: true

@@ -1,6 +1,11 @@
+---
 - hosts: all
-  become: yes
-  tasks:
+  become: true
+  pre_tasks:
+    - name: add default route
+      ansible.builtin.command: ip route add default via 192.168.255.1 dev eth1
+      when: settings['harvester']['airgapped']
+
     - name: install kitty terminfo
       apt:
         name: kitty-terminfo
@@ -8,9 +13,11 @@
     - role: dhcp
     - role: tftp
     - role: https
-      when: settings['networks'][0]['https']
+      when: settings['pxe_server']['https']
     - role: http
     - role: ipxe
     - role: harvester
+    - role: ntpd
+      when: settings['harvester']['airgapped']
     - role: proxy
       when: settings['harvester']['airgapped']

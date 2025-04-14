@@ -15,12 +15,25 @@ os:
   - {{ dns_server }}
 {% endfor %}
   ntp_servers:
+{% if settings['harvester']['airgapped'] %}
+{% for net in settings['networks'] %}
+    - {{ net['subnet'][:-1] }}254
+{% endfor %}
+{% else %}
 {% for ntp_server in settings['harvester']['global']['ntp_servers'] %}
     - {{ ntp_server }}
 {% endfor %}
+{% endif %}
 {% if settings['harvester']['sftp'] %}
   sshd:
     sftp: {{ settings['harvester']['sftp'] }}
+{% endif %}
+  labels:
+    topology.harvesterhci.io/hostname: {{ settings['harvester']['cluster'][node_number | int]['name'] }}
+{% if settings['harvester']['cluster'][node_number | int]['labels'] is defined %}
+{% for key, label in settings['harvester']['cluster'][node_number | int]['labels'].items() %}
+    {{ key }}: {{ label }}
+{% endfor %}
 {% endif %}
 install:
   mode: join

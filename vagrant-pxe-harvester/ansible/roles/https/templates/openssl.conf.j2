@@ -8,12 +8,14 @@ prompt = no
 C = US
 ST = VA
 L = SomeCity
-O = MyCompany
-OU = MyDivision
-CN = {{ settings['pxe_server']['ip'] }}
+O = SUSE Software Solutions GmbH
+OU = ECM
+CN = self-signed test certificate
 [v3_req]
 keyUsage = keyEncipherment, dataEncipherment
 extendedKeyUsage = serverAuth
 subjectAltName = @alt_names
 [alt_names]
-IP.1 = {{ settings['pxe_server']['ip'] }}
+{% for net in settings['networks'] %}
+IP.{{ loop.index }} = {{ net['subnet'][:-1] }}254
+{% endfor %}

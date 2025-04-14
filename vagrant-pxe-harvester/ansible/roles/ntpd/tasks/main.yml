@@ -1,0 +1,12 @@
+---
+- name: install openNTPd
+  apt:
+    name: openntpd
+    state: present
+    update_cache: true
+
+- name: configure openNTPd
+  template:
+    src: ntp.conf.j2
+    dest: /etc/openntpd/ntpd.conf
+  notify: restart ntpd

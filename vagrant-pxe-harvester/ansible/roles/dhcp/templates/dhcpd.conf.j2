@@ -15,7 +15,7 @@ log-facility local7;
 {% if net['dhcp_range'] is defined %}
 subnet {{ net['subnet'] }} netmask {{ net['netmask'] }} {
     range {{ net['dhcp_range']['start'] }} {{ net['dhcp_range']['end'] }};
-    option domain-name-servers {{ net['subnet'][:-1] }}254, {{ settings['pxe_server']['dns_server'] }}, 8.8.8.8;
+    option domain-name-servers {{ net['subnet'][:-1] }}1{% if settings['pxe_server']['dns_server'] is defined %}, {{ settings['pxe_server']['dns_server'] }}{% endif %};
 
 {% if settings['harvester']['airgapped'] %}
     option routers {{ net['subnet'][:-1] }}254;
@@ -39,7 +39,7 @@ subnet {{ net['subnet'] }} netmask {{ net['netmask'] }} {
 {% with node_idx = loop.index0 %}
 {% if net['name'] in node['networks'] %}
     host {{ node['name'] }}-{{ net_idx }} {
-        hardware ethernet 02:00:0{{ net_idx }}:{{ node_idx }}D:62:E2;
+        hardware ethernet 02:00:00:03:3E:{{ net_idx }}{{ node_idx }};
         fixed-address {{ net['subnet'][:-1] }}1{{ node_idx }};
         server-name {{ node['name'] }};
     }

@@ -26,6 +26,6 @@
 - name: create boot entry for the cluster members
   template:
     src: ipxe-join.j2
-    dest: /var/www/harvester/02:00:00:{{ node_number }}d:62:e2
+    dest: /var/www/harvester/02:00:00:03:3e:0{{ node_number }}
     owner: www-data
     mode: 0640
