@@ -17,3 +17,9 @@
     dest: /etc/nginx/sites-enabled/default
     state: link
   notify: restart nginx
+
+- name: set up additional artifacts
+  include_tasks: _download_media.yml
+  vars:
+    media_url: "{{ item }}"
+  loop: "{{ settings['pxe_server']['artifacts'] }}"

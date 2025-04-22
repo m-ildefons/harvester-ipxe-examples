@@ -1,0 +1,25 @@
+---
+- name: parse artifact download URL
+  set_fact:
+    artifact_download_url: "{{ media_url | urlsplit }}"
+    artifact_filename: "{{ media_url | basename }}"
+
+- name: create artifacts directory
+  ansible.builtin.file:
+    path: /var/www/artifacts
+    state: directory
+    owner: www-data
+    recurse: true
+    mode: '0755'
+
+- name: copy artifact from local path
+  copy:
+    src: "{{ artifact_download_url['path'] }}"
+    dest: /var/www/artifacts/{{ artifact_filename }}
+  when: artifact_download_url['scheme']|lower == 'file'
+
+- name: download artifact
+  get_url:
+    url: "{{ artifact_download_url }}"
+    dest: /var/www/artifacts/{{ artifact_filename }}
+  when: artifact_download_url['scheme']|lower != 'file'

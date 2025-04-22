@@ -50,11 +50,6 @@ networks:
     netmask: 255.255.255.0
     airgapped: true
 
-#  - name: migrations
-#    subnet: 192.168.2.0
-#    netmask: 255.255.255.0
-#    airgapped: true
-#
   - name: workloads-1
     subnet: 192.168.3.0
     netmask: 255.255.255.0
@@ -81,6 +76,9 @@ pxe_server:
   # This configures a self-signed certificate on the HTTP server
   https: false
 
+  artifacts:
+    - file:///home/moritz/Downloads/ubuntu-24.04-server-cloudimg-amd64.img
+
 harvester:
   # Run as an airgapped environment that only has internet connectivity through
   # an HTTP proxy. The HTTP proxy runs on DHCP server using port 3128
@@ -90,7 +88,29 @@ harvester:
   vip:
     ip: 192.168.0.131
     mode: dhcp
-    mac: 02:00:00:03:3D:61
+    mac: 02:00:00:03:3D:6e
+
+  # These settings are applied to each Harvester node
+  global:
+    # Enable SFTP service
+    #sftp: true
+
+    # Login password for user `rancher` on each node
+    password: p@ssword
+
+    # This is a list of DNS servers that will be included in your Harvester OS
+    # config
+    dns_servers:
+      - 192.168.0.1
+
+    # If running in an airgapped environment, these servers will be configured
+    # as NTP peers on the PXE server and the PXE server will be NTP server for
+    # the Harvester cluster. Otherwise these servers will be NTP servers for the
+    # Harvester cluster directly.
+    ntp_servers:
+      - 0.suse.pool.ntp.org
+      - 1.suse.pool.ntp.org
+    ssh_authorized_keys: []
 
   # These settings are applied to each Harvester node
   global:
@@ -151,7 +171,7 @@ harvester:
 
     - name: harv0
       cpu: 8
-      memory_G: 14
+      memory_G: 16
       disks:
         - name: vda
           size: 300G
@@ -163,9 +183,56 @@ harvester:
       data_disk: vdb
       networks:
         - mgmt
-        - storage
       role: default
       uefi: true
+
+    - name: harv1
+      cpu: 8
+      memory_G: 16
+      disks:
+        - name: vda
+          size: 300G
+          bus: virtio
+        - name: vdb
+          size: 1000G
+          bus: virtio
+      root_disk: vda
+      data_disk: vdb
+      networks:
+        - mgmt
+      role: default
+      uefi: true
+
+    - name: wit
+      cpu: 4
+      memory_G: 8
+      disks:
+        - name: vda
+          size: 500G
+          bus: virtio
+      root_disk: vda
+      data_disk: vda
+      networks:
+        - mgmt
+      role: default
+      uefi: true
+
+    #  - name: harv0
+    #    cpu: 16
+    #    memory_G: 32
+    #    disks:
+    #      - name: vda
+    #        size: 300G
+    #        bus: virtio
+    #      - name: vdb
+    #        size: 1000G
+    #        bus: virtio
+    #    root_disk: vda
+    #    data_disk: vdb
+    #    networks:
+    #      - mgmt
+    #    role: default
+    #    uefi: true
 
 #    - name: harv0
 #      cpu: 16
