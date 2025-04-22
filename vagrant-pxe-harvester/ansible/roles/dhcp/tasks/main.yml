@@ -5,6 +5,9 @@
     state: present
     update_cache: yes
 
+- set_fact:
+    pxe_address: "{{ settings['networks'][0]['subnet'][:-1] }}254"
+
 - name: configure isc-dhcp-server interface
   template:
     src: isc-dhcp-server.j2

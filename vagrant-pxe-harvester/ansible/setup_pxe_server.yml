@@ -2,13 +2,15 @@
 - hosts: all
   become: true
   pre_tasks:
-    - name: add default route
+
+    - name: add default route for uplink on PXE machine
       ansible.builtin.command: ip route add default via 192.168.255.1 dev eth1
       when: settings['harvester']['airgapped']
 
     - name: install kitty terminfo
       apt:
         name: kitty-terminfo
+
   roles:
     - role: dhcp
     - role: tftp
@@ -20,4 +22,3 @@
     - role: ntpd
       when: settings['harvester']['airgapped']
     - role: proxy
-      when: settings['harvester']['airgapped']

@@ -1,18 +1,7 @@
 ---
-##########################################################################
-# NOTE: this is a YAML file so please pay close attention to the leading #
-# spaces as they are significant.                                        #
-##########################################################################
-
-#
-# iso_url
-# kernel_url
-# initrd_url
-#
 # Harvester media to install. The URL scheme can be either 'http', 'https', or
 # 'file'. If the URL scheme is 'file', the given media will be copied from the
 # local file system instead of downloading from a remote location.
-
 iso_url: >-
   file:///home/moritz/harvester/artifacts/harvester-amd64.iso
 kernel_url: >-
@@ -22,11 +11,31 @@ ramdisk_url: >-
 rootfs_url: >-
   file:///home/moritz/harvester/artifacts/harvester-rootfs-amd64.squashfs
 
+# Global Libvirt options. These are host-system specific, needed to properly set
+# up the libvirt domains
+libvirt:
+  connection: qemu:///system
+  storage_pool: default
+  # On openSUSE the UEFI loader for Qemu is at /usr/share/qemu/ovmf-x86_64.bin,
+  # but other distributions may have it at /usr/share/qemu/OVMF.fd
+  uefi_firmware_path: /usr/share/qemu/ovmf-x86_64.bin
+
 # Define one or more networks. The first network is going to be the management
 # network. It's also going to be used for iPXE, hence it needs parameters `boot`
-# and `https`
+# and in case it should not be able to reach outside also `airgapped`
 # Each network here corresponds to a libvirt network
 # If dhcp_range is defined, there is going to be a DHCP server at x.x.x.254
+# Example:
+#
+# - name: foobar
+#   subnet: 192.168.42.0
+#   netmask: 255.255.255.0
+#   dhcp_range:
+#     start: 192.168.42.100
+#     end: 192.168.42.120
+#   boot: false
+#   airgapped: true
+#
 networks:
   - name: mgmt
     subnet: 192.168.0.0
@@ -39,17 +48,27 @@ networks:
   - name: storage
     subnet: 192.168.1.0
     netmask: 255.255.255.0
+    airgapped: true
 
-  - name: migrations
-    subnet: 192.168.2.0
-    netmask: 255.255.255.0
-
-  - name: workloads
+#  - name: migrations
+#    subnet: 192.168.2.0
+#    netmask: 255.255.255.0
+#    airgapped: true
+#
+  - name: workloads-1
     subnet: 192.168.3.0
     netmask: 255.255.255.0
     dhcp_range:
       start: 192.168.3.50
       end: 192.168.3.250
+
+  - name: workloads-2
+    subnet: 192.168.4.0
+    netmask: 255.255.255.0
+    dhcp_range:
+      start: 192.168.4.50
+      end: 192.168.4.250
+    airgapped: true
 
 pxe_server:
   cpu: 2       # Number of vCPUs
@@ -60,19 +79,40 @@ pxe_server:
   #dns_server: 1.1.1.1
 
   # This configures a self-signed certificate on the HTTP server
-  https: true
+  https: false
 
 harvester:
   # Run as an airgapped environment that only has internet connectivity through
   # an HTTP proxy. The HTTP proxy runs on DHCP server using port 3128
-  airgapped: true
-  sftp: true
+  airgapped: false
   token: token
 
   vip:
     ip: 192.168.0.131
     mode: dhcp
     mac: 02:00:00:03:3D:61
+
+  # These settings are applied to each Harvester node
+  global:
+    # Enable SFTP service
+    #sftp: true
+
+    # Login password for user `rancher` on each node
+    password: p@ssword
+
+    # This is a list of DNS servers that will be included in your Harvester OS
+    # config
+    dns_servers:
+      - 192.168.0.1
+
+    # If running in an airgapped environment, these servers will be configured
+    # as NTP peers on the PXE server and the PXE server will be NTP server for
+    # the Harvester cluster. Otherwise these servers will be NTP servers for the
+    # Harvester cluster directly.
+    ntp_servers:
+      - 0.suse.pool.ntp.org
+      - 1.suse.pool.ntp.org
+    ssh_authorized_keys: []
 
   # Define one or more nodes.
   # Each node can have one or more disks (storage devices) and network
@@ -84,7 +124,48 @@ harvester:
   # Mac addresses are going to be generated: 02:00:0X:Yd:62:e2
   # where X is the number of the network starting at 0 and Y is the number of
   # the node starting at 0
+  #
+  # Example:
+  #
+  # - name: harvester
+  #   cpu: 12
+  #   memory_G: 32
+  #   disks:
+  #     - name: nvme0n1
+  #       size: 300G
+  #       bus: nvme
+  #     - name: vda
+  #       size: 1000G
+  #       bus: virtio
+  #     - name: sda
+  #       size: 1000G
+  #       bus: scsi
+  #   root_disk: nvme0n1
+  #   data_disk: sda
+  #   networks:
+  #     - mgmt
+  #     - foobar
+  #   role: default
+  #   uefi: true
   cluster:
+
+    - name: harv0
+      cpu: 8
+      memory_G: 14
+      disks:
+        - name: vda
+          size: 300G
+          bus: virtio
+        - name: vdb
+          size: 1000G
+          bus: virtio
+      root_disk: vda
+      data_disk: vdb
+      networks:
+        - mgmt
+        - storage
+      role: default
+      uefi: true
 
 #    - name: harv0
 #      cpu: 16
@@ -98,89 +179,75 @@ harvester:
 #      networks:
 #        - mgmt
 #      role: default
-#      labels: {}
+#      uefi: true
 
 # Some examples below:
 #
-    - name: harv0
-      cpu: 8
-      memory_G: 16
-      disks:
-        - name: vda
-          size: 300G
-          bus: virtio
-        - name: sda
-          size: 1000G
-          bus: scsi
-        - name: sdb
-          size: 1000G
-          bus: scsi
-      root_disk: vda
-      data_disk: vda
-      networks:
-        - mgmt
-        - storage
-        - migrations
-        - workloads
-      # role: default, management, witness or worker
-      role: default
+#    - name: harv0
+#      cpu: 8
+#      memory_G: 16
+#      disks:
+#        - name: vda
+#          size: 300G
+#          bus: virtio
+#        - name: sda
+#          size: 1000G
+#          bus: scsi
+#        - name: nvme0n1
+#          size: 1000G
+#          bus: nvme
+#      root_disk: vda
+#      data_disk: vda
+#      networks:
+#        - mgmt
+#        - storage
+#        - migrations
+#        - workloads-1
+#        - workloads-2
+#      # role: default, management, witness or worker
+#      role: default
+#      uefi: true
+#
+#    - name: harv1
+#      cpu: 8
+#      memory_G: 16
+#      disks:
+#        - name: vda
+#          size: 300G
+#          bus: virtio
+#        - name: sda
+#          size: 1000G
+#          bus: scsi
+#        - name: nvme0n1
+#          size: 1000G
+#          bus: nvme
+#      root_disk: vda
+#      data_disk: vda
+#      networks:
+#        - mgmt
+#        - storage
+#        - migrations
+#        - workloads-1
+#        - workloads-2
+#      # role: default, management, witness or worker
+#      role: default
+#      uefi: true
+#
+#    - name: wit
+#      cpu: 4
+#      memory_G: 8
+#      disks:
+#        - name: vda
+#          size: 300G
+#          bus: virtio
+#      root_disk: vda
+#      data_disk: vda
+#      networks:
+#        - mgmt
+#      # role: default, management, witness or worker
+#      role: witness
+#      uefi: true
 
-    - name: harv1
-      cpu: 8
-      memory_G: 16
-      disks:
-        - name: vda
-          size: 300G
-          bus: virtio
-        - name: sda
-          size: 1000G
-          bus: scsi
-        - name: sdb
-          size: 1000G
-          bus: scsi
-      root_disk: vda
-      data_disk: vda
-      networks:
-        - mgmt
-        - storage
-        - migrations
-        - workloads
-      # role: default, management, witness or worker
-      role: default
-
-    - name: wit
-      cpu: 4
-      memory_G: 8
-      disks:
-        - name: vda
-          size: 300G
-          bus: virtio
-      root_disk: vda
-      data_disk: vda
-      networks:
-        - mgmt
-      # role: default, management, witness or worker
-      role: witness
-
-  # These settings are applied to each Harvester node
-  global:
-    password: p@ssword
-    # This is a list of DNS servers that will be included in your Harvester OS
-    # config
-    dns_servers:
-      - 192.168.0.1
-
-    # If running in an airgapped environment, these servers will be configured
-    # as NTP peers on the PXE server and the PXE server will be NTP server for
-    # the Harvester cluster. Otherwise these servers will be NTP servers for the
-    # Harvester cluster directly.
-    ntp_servers:
-      - 0.suse.pool.ntp.org
-      - 1.suse.pool.ntp.org
-    ssh_authorized_keys:
-      # Vagrant default unsecured SSH public key
-      - ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA6NF8iallvQVp22WDkTkyrtvp9eWW6A8YVr+kz4TjGYe7gHzIw+niNltGEFHzD8+v1I2YJ6oXevct1YeS0o9HZyN1Q9qgCgzUFtdOKLv6IedplqoPkcmF0aYet2PkEDo3MlTBckFXPITAMzF8dJSIFo9D8HfdOV0IAdx4O7PtixWKn5y2hMNG0zQPyUecp4pzC6kivAIhyfHilFR61RGL+GPXQ2MWZWFYbAGjyiYJnAmCP3NOTd0jMZEnDkbUvxhMmBYSdETk1rRgm+R4LOzFUGaHqHDLKLX+FIPKcF96hrucXzcWyLbIbEgE98OHlnVYCzRdK8jlqm8tehUc9c9WhQ== vagrant insecure public key
-      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBJTm386wM5VO8ct2dlg76vdayHt7W+58a3c+Nkue7mrhU+eYguPqgvZpHRCPdPX+SLXTqHRCyvwphPLPD8Q+2McJqFkwLavflIHYcDnjAuasnZiI80YDUmgjajfa7m9lSyoKQ7S+knPN6wgFxjyk8ywCIv5cdxu9X3G14LvADO5yl36vIS66rwXXEc6k3GEw9t1yKYk0JIdW2ormupVrQsHin3NLX34NZU3tR6sfPnXotgP+vZr3KKBUuIe4YU+xk6qzSaDROlbePheY/oNfLJC+jzjE39aKyTxgys/qlS31aL+1sYtaq5gc5/yY6oYPu4H5rLNASxOodU645vnCmA5SOYAxzI5KJSTV+w+puzG3uQ1sdZ57BTnluGj59NHl6A1IKTNbfbNfr3I3WIGRQQ0n3zWzb1pPtRed1A8vGSLYEqEyUtkLHjE2rWWNnXv1lAF3u+SPsMNVbWWw7FV+Ctyrn++//YVUhQFZF1VqLYab2hU13Sq5VtGcMbn3mfgTR1LByXRyb0GE8vlEPf82y+8BAhwceSAdd9oiV9Ek/rM79r86rluG5YY17WOfdao0clEELfJC3yUToGIJ7lidcEmxVO/OF8ZJj1M1OXSBD18imNlpt/eLX3PeJ1o2R0m4iD4CYzzTnzxJtwhubOfyEPl55F1XK9fuNP9CkPikztQ== cardno:000610664588"
 
 # rancher_config
 #

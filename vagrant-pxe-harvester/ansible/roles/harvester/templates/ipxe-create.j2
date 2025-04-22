@@ -1,10 +1,6 @@
 #!ipxe
 
-{% for net in settings['networks'] %}
-{% if net['boot'] is defined and net['boot'] %}
-kernel http://{{ net['subnet'][:-1] }}254/harvester/harvester-vmlinuz-amd64
-initrd http://{{ net['subnet'][:-1] }}254/harvester/harvester-initrd-amd64
-{% endif %}
-{% endfor %}
-imgargs harvester-vmlinuz-amd64 initrd=harvester-initrd-amd64 ip={{ boot_interface }}:dhcp net.ifnames=1 rd.cos.disable rd.live.debug=1 rd.noverifyssl root=live:http://{{ hostvars['pxe_server']['ansible_eth0']['ipv4']['address'] }}/harvester/harvester-rootfs-amd64.squashfs console=tty1 harvester.install.automatic=true harvester.install.skipchecks=true harvester.install.config_url=http://{{ hostvars['pxe_server']['ansible_eth0']['ipv4']['address'] }}/harvester/config-create.yaml
+kernel http://{{ pxe_address }}/harvester/harvester-vmlinuz-amd64
+initrd http://{{ pxe_address }}/harvester/harvester-initrd-amd64
+imgargs harvester-vmlinuz-amd64 initrd=harvester-initrd-amd64 ip={{ mgmt_interface }}:dhcp net.ifnames=1 rd.cos.disable rd.live.debug=1 rd.noverifyssl root=live:http://{{ pxe_address }}/harvester/harvester-rootfs-amd64.squashfs console=tty1 harvester.install.automatic=true harvester.install.skipchecks=true harvester.install.config_url=http://{{ pxe_address }}/harvester/config-create.yaml
 boot

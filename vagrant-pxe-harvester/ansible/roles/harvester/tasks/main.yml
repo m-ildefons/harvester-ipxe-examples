@@ -11,6 +11,9 @@
     recurse: yes
 
 - set_fact:
+    pxe_address: "{{ settings['networks'][0]['subnet'][:-1] }}254"
+
+- set_fact:
     disks: "{{ settings.harvester.cluster[0].disks }}"
 
 - set_fact:
@@ -20,12 +23,10 @@
 
 - name: Calculate Iterfaces
   set_fact:
-    boot_interface: ens{{ ( virt_disks | length ) + ( [ ( scsi_disks | length ), 1 ] | min ) + 4 }}
     mgmt_interface: ens{{ ( virt_disks | length ) + ( [ ( scsi_disks | length ), 1 ] | min ) + 5 }}
 
 - debug:
     msg: |
-      node0 boot interface: {{ boot_interface }}
       node0 mgmt interface: {{ mgmt_interface }}
 
 - name: copy config-create.yaml

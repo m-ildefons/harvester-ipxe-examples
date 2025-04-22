@@ -8,12 +8,10 @@
 
 - name: Calculate Iterfaces
   set_fact:
-    boot_interface: ens{{ ( virt_disks | length ) + ( [ ( scsi_disks | length ), 1 ] | min ) + 4 }}
     mgmt_interface: ens{{ ( virt_disks | length ) + ( [ ( scsi_disks | length ), 1 ] | min ) + 5 }}
 
 - debug:
     msg: |
-      node{{ node_number | int }} boot interface: {{ boot_interface }}
       node{{ node_number | int }} mgmt interface: {{ mgmt_interface }}
 
 - name: copy config-join.yaml

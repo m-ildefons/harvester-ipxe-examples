@@ -2,6 +2,7 @@
 
 require 'yaml'
 require 'nokogiri'
+require 'etc'
 
 VAGRANTFILE_API_VERSION = "2"
 
@@ -15,57 +16,88 @@ exit(1) unless _required_plugins_list.all? do |plugin|
   )
 end
 
-def create_nvme(trigger, name, size, type)
-  trigger.warn = "Creating volume #{name}"
-
-  require 'etc'
-  storage_owner = begin
-                    Etc.getpwnam('qemu')
-                  rescue
-                    Etc.getpwnam('root')
-                  end
-
-  trigger.run = {inline: "sh -c \"\
-    virsh -c qemu:///system vol-info --pool default #{name} >/dev/null 2>&1 || \
-    virsh -c qemu:///system vol-create-as default #{name} \
-      --capacity #{size} \
-      --format #{type} \
-      --print-xml | \
-    sed '/<target>/a <permissions><owner>#{storage_owner.uid}</owner><group>#{storage_owner.gid}</group></permissions>' | \
-    virsh -c qemu:///system vol-create default /dev/stdin 2>&1\""}
-end
-
-def delete_nvme(trigger, name)
-  trigger.warn = "Destroying volume #{name}"
-
-  trigger.run = {inline: "sh -c \"\
-    virsh -c qemu:///system vol-delete --pool default #{name} || :\""}
-end
-
 # ensure libvirt is the default provider in case the vagrant box config
 # doesn't specify it
 ENV['VAGRANT_DEFAULT_PROVIDER'] = "libvirt"
 
 @root_dir = File.dirname(File.expand_path(__FILE__))
 @settings = YAML.load_file(File.join(@root_dir, "settings.yml"))
-@pool_path = Nokogiri::XML(%x(virsh -c qemu:///system pool-dumpxml default)).at_xpath('/pool/target/path').content
+
+@libvirt_connection = 'qemu:///system'
+if @settings.key?('libvirt') and @settings['libvirt'].key?('connection')
+  @libvirt_connection = @settings['libvirt']['connection']
+end
+
+@libvirt_pool = 'default'
+if @settings.key?('libvirt') and @settings['libvirt'].key?('storage_pool')
+  @libvirt_pool = @settings['libvirt']['storage_pool']
+end
+
+@libvirt_uefi_firmware = '/usr/share/qemu/ovmf-x86_64.bin'
+if @settings.key?('libvirt') and @settings['libvirt'].key?('uefi_firmware_path')
+  @libvirt_uefi_firmware = @settings['libvirt']['uefi_firmware_path']
+end
+
+@virsh = "virsh -c #{@libvirt_connection}"
+@pool_path = Nokogiri::XML(%x(#{@virsh} pool-dumpxml --pool #{@libvirt_pool})).at_xpath('/pool/target/path').content
+
+def create_nvme(trigger, name, size, type)
+  trigger.name= "Creating volume #{name}"
+
+  owner = begin
+            Etc.getpwnam('qemu')
+          rescue
+            Etc.getpwnam('root')
+          end
+
+  trigger.run = {inline: "sh -c \"\
+    #{@virsh} vol-info --pool #{@libvirt_pool} #{name} >/dev/null 2>&1 || \
+    #{@virsh} vol-create-as --pool #{@libvirt_pool} #{name} \
+      --capacity #{size} \
+      --format #{type} \
+      --print-xml | \
+    sed '/<target>/a <permissions><owner>#{owner.uid}</owner><group>#{owner.gid}</group></permissions>' | \
+    #{@virsh} vol-create --pool #{@libvirt_pool} /dev/stdin 2>&1\""}
+end
+
+def delete_nvme(trigger, name)
+  trigger.name = "Destroying volume #{name}"
+  trigger.run = {inline: "sh -c \"\
+    #{@virsh} vol-info --pool #{@libvirt_pool} #{name} >/dev/null 2>&1 && \
+    #{@virsh} vol-delete --pool #{@libvirt_pool} #{name} >/dev/null 2>&1 || :\""}
+end
+
+def generate_wwn(node_idx, disk_idx)
+  # This will generate a WWN of the form
+  # 0x5100000000000001
+  # which will be unique within the virtual cluster
+  return (5836665117072162817 + (1000 * node_idx) + disk_idx).to_s(16)
+end
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   # continerd is taking more than 60 seconds to shutdown in SUSE platforms
   # so increase the timeout to 120 seconds
   config.vm.graceful_halt_timeout = 120
+
+  # If the environment is airgapped, the management network will also not be
+  # nat'ed to the outside
   if @settings['harvester']['airgapped']
-    config.vm.provider 'libvirt' do |lv, config|
+    config.vm.provider 'libvirt' do |lv, cfg|
       lv.management_network_mode = 'none'
     end
   end
 
-  # PXE Server
+  ## PXE Server
+  ##
+  ## The PXE server provides a number of crucial network services, like NTP,
+  ## DNS and DHCP
   config.vm.define :pxe_server do |pxe_server|
     pxe_server.vm.box = 'generic/debian11'
     pxe_server.vm.hostname = 'pxe-server'
 
+    # If the environment is airgapped, the PXE server gets an additional nat'ed
+    # network to connect to the outside.
     if @settings['harvester']['airgapped']
       pxe_server.vm.network 'private_network',
         ip: '192.168.255.254',
@@ -73,16 +105,20 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         libvirt__dhcp_enabled: false
     end
 
+    # The PXE server is connected to all internal networks, so it can provide
+    # DHCP, DNS, NTP etc. on those networks.
     nets = @settings['networks']
-    num_nets = nets.length - 1
-    (0..num_nets).each do |net_idx|
-      net = nets[net_idx]
+    nets.each_with_index do |net, net_idx|
+      airgapped = false
+      if @settings['harvester']['airgapped'] or (net.key?('airgapped') and net['airgapped'])
+        airgapped = true
+      end
 
       pxe_server.vm.network 'private_network',
         ip: "#{net['subnet'][0, net['subnet'].length - 1]}254",
         libvirt__network_name: net['name'],
         libvirt__dhcp_enabled: false,
-        libvirt__forward_mode: @settings['harvester']['airgapped'] ? 'none' : 'nat'
+        libvirt__forward_mode: airgapped ? 'none' : 'nat'
     end
 
     pxe_server.vm.provider :libvirt do |libvirt|
@@ -99,22 +135,21 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     end
   end
 
-  # Harvester
+  ## Harvester
+  ##
+  ## Each Harvester node gets its own hardware configuration. It is then booted
+  ## from the network to provision the software on it.
   nodes = @settings['harvester']['cluster']
-  num_nodes = nodes.length - 1
-  (0..num_nodes).each do |node_idx|
-    node = nodes[node_idx]
-
+  nodes.each_with_index do |node, node_idx|
     vm_name = node.key?('name') ? node['name'] : "node-#{node_idx}"
     config.vm.define vm_name, autostart: false do |harvester_node|
       harvester_node.vm.hostname = vm_name
 
+      boot_network = {'network' => @settings['networks'][0]['name']}
+      # Connect the node only to the networks specified in the settings
       nets = @settings['networks']
-      num_nets = nets.length - 1
-      (0..num_nets).each do |net_idx|
-        net = nets[net_idx]
-
-        if net.key?('boot') && net['boot'] == true
+      nets.each_with_index do |net, net_idx|
+        if net.key?('boot') and net['boot'] == true
           boot_network = {'network' => net['name']}
         end
 
@@ -130,23 +165,40 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         libvirt.cpu_mode = 'host-passthrough'
         libvirt.memory = node.key?('memory_G') ? (node['memory_G'] * 1024) : 8192
         libvirt.cpus = node.key?('cpu') ? node['cpu'] : 4
+        libvirt.boot 'hd'
+        libvirt.boot boot_network
+        libvirt.nic_model_type = 'virtio'
 
-        # disks
+        # Don't attach vagrant management network, figure out SSH access through
+        # Harvester's cluster networks.
+        libvirt.mgmt_attach = false
+        libvirt.qemu_use_agent = true
+        harvester_node.ssh.host = "#{@settings['networks'][0]['subnet'][0, @settings['networks'][0]['subnet'].length - 1]}1#{node_idx}"
+        harvester_node.ssh.username = "rancher"
+
+        # Setup UEFI booting, unless explicitly disabled.
+        if not node.key?('uefi') or node['uefi'] == true
+          libvirt.loader = @libvirt_uefi_firmware
+        end
+
+        # Disks
         disks = node['disks']
-        num_disks = disks.length - 1
-        (0..num_disks).each do |disk_idx|
-          disk = disks[disk_idx]
-
+        disks.each_with_index do |disk, disk_idx|
           if disk['bus'] == 'scsi'
+            # If it's a SCSI disk, we need to generate a wwn if non is given.
             libvirt.storage :file,
               device: disk['name'],
               size: disk['size'],
-              type: 'qcow2',
+              type: disk.key?('type') ? disk['type'] : 'qcow2',
               bus: disk['bus'],
               cache: disk.key?('cache') ? disk['cache'] : 'default',
-              wwn: disk.key?('wwn') ? disk['wwn'] : (5836665117072162817 + node_idx + disk_idx).to_s(16)
+              wwn: disk.key?('wwn') ? disk['wwn'] : generate_wwn(node_idx, disk_idx)
           elsif disk['bus'] == 'nvme'
-            nvme_name = "#{File.basename(@root_dir)}_#{vm_name}-#{disk['name']}.qcow2"
+            # NVMe is not directly supported by Vagrant. Hence we need to use raw
+            # qemu command line arguments to attach an NVMe drive. This also
+            # means we need to manage the backing image file ourselves
+            nvme_type = disk.key?('type') ? disk['type'] : 'qcow2'
+            nvme_name = "#{File.basename(@root_dir)}_#{vm_name}-#{disk['name']}.#{nvme_type}"
             nvme_path = File.join(@pool_path, nvme_name)
 
             bootidx_str = ""
@@ -169,39 +221,22 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
             libvirt.qemuargs :value => "nvme,addr=#{addr},drive=#{disk['name']},serial=#{serial_nr}#{bootidx_str}"
 
             harvester_node.trigger.before :up do |trigger|
-              create_nvme(trigger, nvme_name, disk['size'], disk.key?('type') ? disk['type'] : 'qcow2')
+              create_nvme(trigger, nvme_name, disk['size'], nvme_type)
             end
 
             harvester_node.trigger.before :destroy do |trigger|
               delete_nvme(trigger, nvme_name)
             end
           else
+            # By default, just attach the disk as virtio drive.
             libvirt.storage :file,
               device: disk['name'],
               size: disk['size'],
-              type: 'qcow2',
+              type: disk.key?('type') ? disk['type'] : 'qcow2',
               bus: disk.key?('bus') ? disk['bus'] : 'virtio',
               cache: disk.key?('cache') ? disk['cache'] : 'default'
           end
         end
-
-        boot_network = {'network' => @settings['networks'][0]['name']}
-        nets = @settings['networks']
-        num_nets = nets.length - 1
-        (0..num_nets).each do |net_idx|
-          net = nets[net_idx]
-
-          if net.key?('boot') && net['boot'] == true
-            boot_network = {'network' => net['name']}
-          end
-        end
-        libvirt.boot 'hd'
-        libvirt.boot boot_network
-        # NOTE: default to UEFI boot. Comment this out for legacy BIOS.
-        # libvirt.loader = '/usr/share/qemu/OVMF.fd'
-        libvirt.loader = '/usr/share/qemu/ovmf-x86_64.bin'
-        # libvirt.nic_model_type = 'e1000'
-        libvirt.nic_model_type = 'virtio'
       end
     end
   end
