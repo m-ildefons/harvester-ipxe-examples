@@ -125,6 +125,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       libvirt.cpu_mode = 'host-passthrough'
       libvirt.memory = @settings['pxe_server'].key?('memory_G') ? @settings['pxe_server']['memory_G'] * 1024 : 4096
       libvirt.cpus = @settings['pxe_server'].key?('cpu') ? @settings['pxe_server']['cpu'] : 2
+
+      if @settings['s3']['enabled']
+        libvirt.storage :file,
+          size: @settings['s3']['capacity'],
+          type: 'qcow2',
+          bus: 'virtio',
+          device: 'vdb'
+      end
     end
 
     pxe_server.vm.provision :ansible do |ansible|

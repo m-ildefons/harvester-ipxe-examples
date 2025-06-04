@@ -22,3 +22,5 @@
     - role: ntpd
       when: settings['harvester']['airgapped']
     - role: proxy
+    - role: s3
+      when: settings['s3']['enabled'] | bool

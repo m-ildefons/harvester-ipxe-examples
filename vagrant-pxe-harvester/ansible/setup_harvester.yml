@@ -40,6 +40,9 @@
       node_number: "{{ item }}"
     with_sequence: 0-{{ harvester['cluster'] | length - 1 }}
 
+  - ansible.builtin.debug:
+      msg: Harvester Installation Completed
+
   - name: install Rancher {{ rancher_config.version }}
     shell: >
       vagrant up rancher
@@ -59,4 +62,3 @@
 
   - debug:
       msg: Installation Completed
-

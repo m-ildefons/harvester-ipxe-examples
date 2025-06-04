@@ -45,25 +45,30 @@ networks:
       end: 192.168.0.130
     boot: true
 
-  - name: storage
+  - name: net-1
     subnet: 192.168.1.0
     netmask: 255.255.255.0
     airgapped: true
 
-  - name: workloads-1
-    subnet: 192.168.3.0
+  - name: net-2
+    subnet: 192.168.2.0
     netmask: 255.255.255.0
-    dhcp_range:
-      start: 192.168.3.50
-      end: 192.168.3.250
-
-  - name: workloads-2
-    subnet: 192.168.4.0
-    netmask: 255.255.255.0
-    dhcp_range:
-      start: 192.168.4.50
-      end: 192.168.4.250
     airgapped: true
+#
+#  - name: workloads-1
+#    subnet: 192.168.3.0
+#    netmask: 255.255.255.0
+#    dhcp_range:
+#      start: 192.168.3.50
+#      end: 192.168.3.250
+#
+#  - name: workloads-2
+#    subnet: 192.168.4.0
+#    netmask: 255.255.255.0
+#    dhcp_range:
+#      start: 192.168.4.50
+#      end: 192.168.4.250
+#    airgapped: true
 
 pxe_server:
   cpu: 2       # Number of vCPUs
@@ -71,13 +76,22 @@ pxe_server:
   # Change this to a custom DNS server if you need one for your DHCP scope
   # In each network, xxx.yyy.zzz.1 is automatically added as DNS server. This
   # server is provided by dnsmasq on the libvirt host
-  #dns_server: 1.1.1.1
+  # dns_server: 1.1.1.1
 
   # This configures a self-signed certificate on the HTTP server
   https: false
 
   artifacts:
     - file:///home/moritz/Downloads/ubuntu-24.04-server-cloudimg-amd64.img
+    - file:///home/moritz/harvester/artifacts/v1.5.1-rc2/harvester-v1.5.1-rc2-amd64.iso
+
+s3:
+  enabled: true
+  capacity: 300G
+  port: 9000
+  console_port: 9001
+  username: admin
+  password: password1234
 
 harvester:
   # Run as an airgapped environment that only has internet connectivity through
@@ -93,7 +107,7 @@ harvester:
   # These settings are applied to each Harvester node
   global:
     # Enable SFTP service
-    #sftp: true
+    # sftp: true
 
     # Login password for user `rancher` on each node
     password: p@ssword
@@ -170,8 +184,8 @@ harvester:
   cluster:
 
     - name: harv0
-      cpu: 8
-      memory_G: 16
+      cpu: 16
+      memory_G: 32
       disks:
         - name: vda
           size: 300G
@@ -183,56 +197,10 @@ harvester:
       data_disk: vdb
       networks:
         - mgmt
+        - net-1
+        - net-2
       role: default
       uefi: true
-
-    - name: harv1
-      cpu: 8
-      memory_G: 16
-      disks:
-        - name: vda
-          size: 300G
-          bus: virtio
-        - name: vdb
-          size: 1000G
-          bus: virtio
-      root_disk: vda
-      data_disk: vdb
-      networks:
-        - mgmt
-      role: default
-      uefi: true
-
-    - name: wit
-      cpu: 4
-      memory_G: 8
-      disks:
-        - name: vda
-          size: 500G
-          bus: virtio
-      root_disk: vda
-      data_disk: vda
-      networks:
-        - mgmt
-      role: default
-      uefi: true
-
-    #  - name: harv0
-    #    cpu: 16
-    #    memory_G: 32
-    #    disks:
-    #      - name: vda
-    #        size: 300G
-    #        bus: virtio
-    #      - name: vdb
-    #        size: 1000G
-    #        bus: virtio
-    #    root_disk: vda
-    #    data_disk: vdb
-    #    networks:
-    #      - mgmt
-    #    role: default
-    #    uefi: true
 
 #    - name: harv0
 #      cpu: 16
