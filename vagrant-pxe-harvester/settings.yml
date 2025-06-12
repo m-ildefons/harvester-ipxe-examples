@@ -2,14 +2,22 @@
 # Harvester media to install. The URL scheme can be either 'http', 'https', or
 # 'file'. If the URL scheme is 'file', the given media will be copied from the
 # local file system instead of downloading from a remote location.
-iso_url: >-
+iso_amd64: >-
   file:///home/moritz/harvester/artifacts/harvester-amd64.iso
-kernel_url: >-
+kernel_amd64: >-
   file:///home/moritz/harvester/artifacts/harvester-vmlinuz-amd64
-ramdisk_url: >-
+ramdisk_amd64: >-
   file:///home/moritz/harvester/artifacts/harvester-initrd-amd64
-rootfs_url: >-
+rootfs_amd64: >-
   file:///home/moritz/harvester/artifacts/harvester-rootfs-amd64.squashfs
+iso_arm64: >-
+  file:///home/moritz/harvester/artifacts/harvester-arm64.iso
+kernel_arm64: >-
+  file:///home/moritz/harvester/artifacts/harvester-vmlinuz-arm64
+ramdisk_arm64: >-
+  file:///home/moritz/harvester/artifacts/harvester-initrd-arm64
+rootfs_arm64: >-
+  file:///home/moritz/harvester/artifacts/harvester-rootfs-arm64.squashfs
 
 # Global Libvirt options. These are host-system specific, needed to properly set
 # up the libvirt domains
@@ -184,6 +192,7 @@ harvester:
   cluster:
 
     - name: harv0
+      arch: arm64
       cpu: 16
       memory_G: 32
       disks:

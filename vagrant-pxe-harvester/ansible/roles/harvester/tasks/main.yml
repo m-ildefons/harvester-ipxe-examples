@@ -35,6 +35,8 @@
     dest: /var/www/harvester/config-create.yaml
     owner: www-data
     mode: 0640
+  vars:
+    arch: "{{ settings.harvester.cluster[0].arch | default('amd64') }}"
 
 - name: create boot entry for the first node
   template:
@@ -42,6 +44,8 @@
     dest: /var/www/harvester/02:00:00:03:3e:00
     owner: www-data
     mode: 0640
+  vars:
+    arch: "{{ settings.harvester.cluster[0].arch | default('amd64') }}"
 
 # NOTE(gyee): Ansible pre-process the with_sequence variable so we have to
 # make sure end sequence is at least 1 even if we have only one Harvester node
@@ -59,26 +63,50 @@
 
   when: end_sequence | int > 1
 
-- name: download Harvester kernel
+- name: download Harvester kernel amd64
   include_tasks: _download_media.yml
   vars:
-    harvester_media_url: "{{ settings['kernel_url'] }}"
+    harvester_media_url: "{{ settings['kernel_amd64'] }}"
     media_filename: "harvester-vmlinuz-amd64"
 
-- name: download Harvester ramdisk
+- name: download Harvester ramdisk amd64
   include_tasks: _download_media.yml
   vars:
-    harvester_media_url: "{{ settings['ramdisk_url'] }}"
+    harvester_media_url: "{{ settings['ramdisk_amd64'] }}"
     media_filename: "harvester-initrd-amd64"
 
-- name: download Harvester ISO
+- name: download Harvester ISO amd64
   include_tasks: _download_media.yml
   vars:
-    harvester_media_url: "{{ settings['iso_url'] }}"
+    harvester_media_url: "{{ settings['iso_amd64'] }}"
     media_filename: "harvester-amd64.iso"
 
-- name: download Harvester Root FS
+- name: download Harvester Root FS amd64
   include_tasks: _download_media.yml
   vars:
-    harvester_media_url: "{{ settings['rootfs_url'] }}"
+    harvester_media_url: "{{ settings['rootfs_amd64'] }}"
     media_filename: "harvester-rootfs-amd64.squashfs"
+
+- name: download Harvester kernel arm64
+  include_tasks: _download_media.yml
+  vars:
+    harvester_media_url: "{{ settings['kernel_arm64'] }}"
+    media_filename: "harvester-vmlinuz-arm64"
+
+- name: download Harvester ramdisk arm64
+  include_tasks: _download_media.yml
+  vars:
+    harvester_media_url: "{{ settings['ramdisk_arm64'] }}"
+    media_filename: "harvester-initrd-arm64"
+
+- name: download Harvester ISO arm64
+  include_tasks: _download_media.yml
+  vars:
+    harvester_media_url: "{{ settings['iso_arm64'] }}"
+    media_filename: "harvester-arm64.iso"
+
+- name: download Harvester Root FS arm64
+  include_tasks: _download_media.yml
+  vars:
+    harvester_media_url: "{{ settings['rootfs_arm64'] }}"
+    media_filename: "harvester-rootfs-arm64.squashfs"

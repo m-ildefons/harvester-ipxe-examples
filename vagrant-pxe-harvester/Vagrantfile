@@ -170,9 +170,29 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
       harvester_node.vm.provider :libvirt do |libvirt|
         # libvirt.nested = true
-        libvirt.cpu_mode = 'host-passthrough'
-        libvirt.memory = node.key?('memory_G') ? (node['memory_G'] * 1024) : 8192
+        if node.key?('arch') and node['arch'] == 'arm64'
+          libvirt.driver = 'qemu'
+          libvirt.features = ['apic', 'pae', "gic version='3'"]
+          libvirt.inputs = []
+
+          # libvirt.graphics_port = 5900 + node_idx
+          # libvirt.graphics_passwd = 'vnc'
+          libvirt.video_type = 'vga'
+          libvirt.qemuargs :value => '-device'
+          libvirt.qemuargs :value => 'virtio-gpu-pci,addr=12'
+
+          libvirt.cpu_mode = 'custom'
+          libvirt.cpu_model = 'cortex-a72'
+          libvirt.machine_arch = 'aarch64'
+          libvirt.machine_type = 'virt'
+        else
+          libvirt.cpu_mode = 'host-passthrough'
+          libvirt.machine_arch = 'x86_64'
+        end
+
         libvirt.cpus = node.key?('cpu') ? node['cpu'] : 4
+        libvirt.memory = node.key?('memory_G') ? (node['memory_G'] * 1024) : 8192
+
         libvirt.boot 'hd'
         libvirt.boot boot_network
         libvirt.nic_model_type = 'virtio'
@@ -187,6 +207,10 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         # Setup UEFI booting, unless explicitly disabled.
         if not node.key?('uefi') or node['uefi'] == true
           libvirt.loader = @libvirt_uefi_firmware
+
+          if node.key?('arch') and node['arch'] == 'arm64'
+            libvirt.loader = '/usr/share/qemu/aavmf-aarch64-code.bin'
+          end
         end
 
         # Disks

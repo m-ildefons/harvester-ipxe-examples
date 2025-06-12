@@ -28,10 +28,15 @@ subnet {{ net['subnet'] }} netmask {{ net['netmask'] }} {
 
     if exists user-class and option user-class = "iPXE" {
         filename "http://{{ net['subnet'][:-1] }}254/harvester/${net0/mac}";
-    } elsif option arch != 00:00 {
-        filename "ipxe/ipxe.efi";
+    } elsif exists arch and option arch = 00:0b {
+        # arch == 00:0b arm EFI
+        filename "ipxe/arm64/ipxe.efi";
+    } elsif exists arch and option arch != 00:00 {
+        # arch == 00:07 amd EFI
+        filename "ipxe/amd64/ipxe.efi";
     } else {
-        filename "ipxe/undionly.kpxe";
+        # arch == 00:00 amd64 BIOS
+        filename "ipxe/amd64/undionly.kpxe";
     }
 {% endif %}
 

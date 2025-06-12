@@ -1,3 +1,4 @@
+---
 - set_fact:
     disks: "{{ settings.harvester.cluster[node_number | int].disks }}"
 
@@ -20,6 +21,8 @@
     dest: /var/www/harvester/config-join-{{ node_number }}.yaml
     owner: www-data
     mode: 0640
+  vars:
+    arch: "{{ settings.harvester.cluster[node_number | int].arch | default('amd64') }}"
 
 - name: create boot entry for the cluster members
   template:
@@ -27,3 +30,5 @@
     dest: /var/www/harvester/02:00:00:03:3e:0{{ node_number }}
     owner: www-data
     mode: 0640
+  vars:
+    arch: "{{ settings.harvester.cluster[node_number | int].arch | default('amd64') }}"

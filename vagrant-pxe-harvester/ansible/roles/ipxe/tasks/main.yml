@@ -1,13 +1,23 @@
 ---
 - name: create ipxe dir
   file:
-    path: /tftpboot/ipxe
+    path: '{{ item }}'
     state: directory
+  loop:
+    - '/tftpboot/ipxe/amd64'
+    - '/tftpboot/ipxe/arm64'
 
-- name: install ipxe firmwares
+- name: install ipxe firmwares amd64
   get_url:
     url: '{{ item }}'
-    dest: /tftpboot/ipxe/
+    dest: /tftpboot/ipxe/amd64/
   loop:
-    - "http://boot.ipxe.org/ipxe.efi"
-    - "http://boot.ipxe.org/undionly.kpxe"
+    - "https://boot.ipxe.org/ipxe.efi"
+    - "https://boot.ipxe.org/undionly.kpxe"
+
+- name: install ipxe firmware arm64
+  get_url:
+    url: '{{ item }}'
+    dest: /tftpboot/ipxe/arm64/
+  loop:
+    - "https://boot.ipxe.org/arm64-efi/ipxe.efi"
