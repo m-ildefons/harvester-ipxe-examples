@@ -34,6 +34,19 @@ os:
     {{ key }}: {{ label }}
 {% endfor %}
 {% endif %}
+{% if settings['harvester']['airgapped'] %}
+  environment:
+    http_proxy: http://{{ settings['networks'][0]['subnet'][:-1] }}254:3128
+    https_proxy: https://{{ settings['networks'][0]['subnet'][:-1] }}254:3128
+{% endif %}
+
+{% for disk in settings['harvester']['cluster'][node_number | int]['disks'] %}
+{% if disk['mpath'] is defined %}
+  externalStorageConfig:
+    enabled: true
+{% endif %}
+{% endfor %}
+
 install:
   mode: join
 {% if settings['harvester']['cluster'][node_number | int]['role'] != 'default' %}

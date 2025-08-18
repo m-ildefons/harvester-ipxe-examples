@@ -39,6 +39,14 @@ os:
     http_proxy: http://{{ settings['networks'][0]['subnet'][:-1] }}254:3128
     https_proxy: https://{{ settings['networks'][0]['subnet'][:-1] }}254:3128
 {% endif %}
+
+{% for disk in settings['harvester']['cluster'][0]['disks'] %}
+{% if disk['mpath'] is defined %}
+  externalStorageConfig:
+    enabled: true
+{% endif %}
+{% endfor %}
+
 install:
   mode: create
 {% if settings['harvester']['cluster'][0]['role'] != 'default' %}
