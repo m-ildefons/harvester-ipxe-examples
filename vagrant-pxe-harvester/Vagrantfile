@@ -74,6 +74,12 @@ def generate_wwn(node_idx, disk_idx)
   return (5836665117072162817 + (1000 * node_idx) + disk_idx).to_s(16)
 end
 
+def generate_serial(node_idx, disk_idx)
+  # This will generate a serial number, which will be unique within the virtual
+  # cluster
+  return (0000000000000000000 + (1000 * node_idx) + disk_idx).to_s(16)
+end
+
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   # continerd is taking more than 60 seconds to shutdown in SUSE platforms
@@ -193,14 +199,56 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         disks = node['disks']
         disks.each_with_index do |disk, disk_idx|
           if disk['bus'] == 'scsi'
-            # If it's a SCSI disk, we need to generate a wwn if non is given.
-            libvirt.storage :file,
-              device: disk['name'],
-              size: disk['size'],
-              type: disk.key?('type') ? disk['type'] : 'qcow2',
-              bus: disk['bus'],
-              cache: disk.key?('cache') ? disk['cache'] : 'default',
-              wwn: disk.key?('wwn') ? disk['wwn'] : generate_wwn(node_idx, disk_idx)
+            # If the `mpath` parameter is given, a the disk will be attached
+            # twice. Once under the device name and another time under the mpath
+            # name.
+            if disk.key?('mpath')
+              disk_type = 'raw'
+              disk_name = "#{vm_name}-#{disk['name']}.#{disk_type}"
+              disk_path = disk_name
+
+              harvester_node.trigger.before :up do |trigger|
+                create_nvme(trigger, disk_name, disk['size'], disk_type)
+              end
+
+              harvester_node.trigger.before :destroy do |trigger|
+                delete_nvme(trigger, disk_name)
+              end
+
+              libvirt.storage :file,
+                path: disk_path,
+                allow_existing: true,
+                shareable: true,
+                device: disk['name'],
+                size: disk['size'],
+                type: 'raw',
+                bus: disk['bus'],
+                cache: disk.key?('cache') ? disk['cache'] : 'default',
+                serial: disk.key?('serial') ? disk['serial'] : generate_serial(node_idx, disk_idx),
+                wwn: disk.key?('wwn') ? disk['wwn'] : generate_wwn(node_idx, disk_idx)
+              libvirt.storage :file,
+                path: disk_path,
+                allow_existing: true,
+                shareable: true,
+                device: disk['mpath'],
+                size: disk['size'],
+                type: 'raw',
+                bus: disk['bus'],
+                cache: disk.key?('cache') ? disk['cache'] : 'default',
+                serial: disk.key?('serial') ? disk['serial'] : generate_serial(node_idx, disk_idx),
+                wwn: disk.key?('wwn') ? disk['wwn'] : generate_wwn(node_idx, disk_idx)
+            else
+              # If it's a SCSI disk, we need to generate a wwn if non is given.
+              libvirt.storage :file,
+                device: disk['name'],
+                size: disk['size'],
+                type: disk.key?('type') ? disk['type'] : 'qcow2',
+                bus: disk['bus'],
+                cache: disk.key?('cache') ? disk['cache'] : 'default',
+                serial: disk.key?('serial') ? disk['serial'] : generate_serial(node_idx, disk_idx),
+                wwn: disk.key?('wwn') ? disk['wwn'] : generate_wwn(node_idx, disk_idx)
+            end
+
           elsif disk['bus'] == 'nvme'
             # NVMe is not directly supported by Vagrant. Hence we need to use raw
             # qemu command line arguments to attach an NVMe drive. This also

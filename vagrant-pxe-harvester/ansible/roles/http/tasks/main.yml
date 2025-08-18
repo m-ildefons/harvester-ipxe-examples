@@ -7,6 +7,12 @@
 
 - name: configure default site
   copy:
+    src: nginx.conf
+    dest: /etc/nginx/nginx.conf
+  notify: restart nginx
+
+- name: configure default site
+  copy:
     src: default
     dest: /etc/nginx/sites-available
   notify: restart nginx

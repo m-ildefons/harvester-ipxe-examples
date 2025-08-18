@@ -40,6 +40,18 @@
       node_number: "{{ item }}"
     with_sequence: 0-{{ harvester['cluster'] | length - 1 }}
 
+  - name: wait for Harvester API
+    ansible.builtin.uri:
+      url: "https://{{ harvester.vip.ip }}"
+      status_code: 200
+      validate_certs: false
+    register: harvester_api
+    until:
+      - harvester_api is succeeded
+      - harvester_api.status == 200
+    retries: 30
+    delay: 10
+
   - ansible.builtin.debug:
       msg: Harvester Installation Completed
 

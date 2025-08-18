@@ -82,8 +82,8 @@ pxe_server:
   https: false
 
   artifacts:
-    - file:///home/moritz/Downloads/ubuntu-24.04-server-cloudimg-amd64.img
-    - file:///home/moritz/harvester/artifacts/v1.5.1-rc2/harvester-v1.5.1-rc2-amd64.iso
+    - file:///home/moritz/harvester/artifacts/vm-images/openSUSE-Leap-15.6.x86_64-NoCloud.qcow2
+    - file:///home/moritz/harvester/artifacts/v1.6.0-rc5/harvester-v1.6.0-rc5-amd64.iso
 
 s3:
   enabled: true
@@ -171,6 +171,12 @@ harvester:
         - name: vdb
           size: 1000G
           bus: virtio
+
+        - name: sda
+          size: 50G
+          bus: scsi
+          mpath: sdb
+
       root_disk: vda
       data_disk: vdb
       networks:
